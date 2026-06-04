@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tuckshop</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+<style>
+body{
+  font-family: Arial, sans-serif;
+  max-width: 1000px;
+  margin: auto;
+  padding: 20px;
+}
+
+#products{
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.product{
+  padding: 12px;
+  border-width: 4px;
+  border-color: black;
+}
+
+.instock{
+  border-style: outset;
+}
+
+.outstock{
+  border-style: inset;
+  opacity: 0.6;
+}
+
+button{
+  cursor: pointer;
+  margin: 5px;
+}
+
+#summary{
+  margin-top: 20px;
+  border: 1px solid black;
+  padding: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Tuckshop</h1>
+
+<input id="customerName" placeholder="Enter your name">
+
+<br><br>
+
+<label>
+<input type="checkbox" id="delivery">
+Delivery (+R2)
+</label>
+
+<h2>Products</h2>
+<div id="products"></div>
+
+<div id="summary">
+<h3>Order Summary</h3>
+
+<div id="items"></div>
+
+<p>Subtotal: R<span id="subtotal">0</span></p>
+<p>Total: R<span id="total">0</span></p>
+
+<button id="orderBtn">Place Order</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-database.js";
+
+const firebaseConfig = {
+apiKey: "AIzaSyDq99pDzZm4QEivEoB3dKLm7lJCC1QIlh8",
+authDomain: "tuck-2edeb.firebaseapp.com",
+databaseURL: "https://tuck-2edeb-default-rtdb.asia-southeast1.firebasedatabase.app",
+projectId: "tuck-2edeb",
+storageBucket: "tuck-2edeb.firebasestorage.app",
+messagingSenderId: "307424961667",
+appId: "1:307424961667:web:e09fe9f521d483055627b6",
+measurementId: "G-CJS8Y2JNDX"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+emailjs.init("5eYYbZYCikjsyOd56");
+
+let products = {};
+let cart = {};
+
+const productsDiv = document.getElementById("products");
+
+function render(){
+
+productsDiv.innerHTML = "";
+
+for(const id in products){
+
+const p = products[id];
+const stock = Number(p.stock || 0);
+
+const card = document.createElement("div");
+card.className = "product " + (stock > 0 ? "instock" : "outstock");
+
+card.innerHTML = `
+<h3>${stock === 0 ? "❌ " : ""}${p.name}</h3>
+<p>R${p.price}</p>
+${stock === 0 ? "<p>Out of stock</p>" : ""}
+`;
+
+if(stock > 0){
+
+const minus = document.createElement("button");
+const plus = document.createElement("button");
+const qty = document.createElement("span");
+
+minus.textContent = "-";
+plus.textContent = "+";
+qty.textContent = cart[id] || 0;
+
+minus.onclick = () => {
+cart[id] = Math.max(0, (cart[id] || 0) - 1);
+render();
+update();
+};
+
+plus.onclick = () => {
+cart[id] = (cart[id] || 0) + 1;
+render();
+update();
+};
+
+card.append(minus, qty, plus);
+}
+
+productsDiv.appendChild(card);
+}
+}
+
+function update(){
+
+let subtotal = 0;
+let text = "";
+
+for(const id in cart){
+if(cart[id] > 0){
+subtotal += products[id].price * cart[id];
+text += `${products[id].name} x${cart[id]}<br>`;
+}
+}
+
+document.getElementById("items").innerHTML = text;
+
+let total = subtotal + (document.getElementById("delivery").checked ? 2 : 0);
+
+document.getElementById("subtotal").textContent = subtotal.toFixed(2);
+document.getElementById("total").textContent = total.toFixed(2);
+}
+
+document.getElementById("delivery").onchange = update;
+
+onValue(ref(db, "products"), snap => {
+products = snap.val() || {};
+render();
+update();
+});
+
+document.getElementById("orderBtn").onclick = async () => {
+
+const name = document.getElementById("customerName").value.trim();
+if(!name) return alert("Enter your name");
+
+let items = {};
+let subtotal = 0;
+let itemsText = "";
+
+for(const id in cart){
+if(cart[id] > 0){
+items[id] = cart[id];
+subtotal += products[id].price * cart[id];
+itemsText += `${products[id].name} x${cart[id]}\n`;
+}
+}
+
+if(Object.keys(items).length === 0){
+return alert("Select items");
+}
+
+const delivery = document.getElementById("delivery").checked;
+const total = subtotal + (delivery ? 2 : 0);
+
+await push(ref(db, "orders"), {
+name,
+items,
+delivery,
+total,
+time: Date.now()
+});
+
+await emailjs.send(
+"service_1jufcmr",
+"template_yqidmxr",
+{
+name: name,
+items: itemsText,
+deliveryYesNo: delivery ? "Yes" : "No",
+totalMoney: "R" + total.toFixed(2)
+}
+);
+
+alert("Order placed!");
+cart = {};
+render();
+update();
+};
+</script>
+
+</body>
+</html>

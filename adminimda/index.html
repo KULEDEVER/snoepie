@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin</title>
+
+<style>
+body{
+  font-family: Arial;
+  max-width: 900px;
+  margin: auto;
+  padding: 20px;
+}
+
+.box{
+  border: 1px solid black;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Admin Panel</h1>
+
+<h2>Add Product</h2>
+
+<input id="name" placeholder="Name">
+<input id="price" type="number" placeholder="Price">
+<input id="stock" type="number" placeholder="Stock">
+<button id="add">Add</button>
+
+<h2>Products</h2>
+<div id="products"></div>
+
+<h2>Orders</h2>
+<div id="orders"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import { getDatabase, ref, push, set, remove, onValue } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-database.js";
+
+const firebaseConfig = {
+apiKey: "AIzaSyDq99pDzZm4QEivEoB3dKLm7lJCC1QIlh8",
+authDomain: "tuck-2edeb.firebaseapp.com",
+databaseURL: "https://tuck-2edeb-default-rtdb.asia-southeast1.firebasedatabase.app",
+projectId: "tuck-2edeb",
+storageBucket: "tuck-2edeb.firebasestorage.app",
+messagingSenderId: "307424961667",
+appId: "1:307424961667:web:e09fe9f521d483055627b6",
+measurementId: "G-CJS8Y2JNDX"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+document.getElementById("add").onclick = async () => {
+
+const name = document.getElementById("name").value.trim();
+const price = Number(document.getElementById("price").value);
+const stock = Number(document.getElementById("stock").value);
+
+if(!name) return;
+
+await push(ref(db, "products"), {
+name,
+price,
+stock
+});
+
+};
+
+onValue(ref(db, "products"), snap => {
+
+const data = snap.val() || {};
+const div = document.getElementById("products");
+
+div.innerHTML = "";
+
+for(const id in data){
+
+const p = data[id];
+
+const box = document.createElement("div");
+box.className = "box";
+
+box.innerHTML = `
+<b>${p.name}</b><br>
+Price: R${p.price}<br>
+Stock:
+<input id="s_${id}" type="number" value="${p.stock}">
+<button id="save_${id}">Save</button>
+<button id="del_${id}">Delete</button>
+`;
+
+div.appendChild(box);
+
+setTimeout(() => {
+
+document.getElementById("save_" + id).onclick = () => {
+set(ref(db, "products/" + id + "/stock"),
+Number(document.getElementById("s_" + id).value)
+);
+};
+
+document.getElementById("del_" + id).onclick = () => {
+if(confirm("Delete?")){
+remove(ref(db, "products/" + id));
+}
+};
+
+});
+}
+});
+
+onValue(ref(db, "orders"), snap => {
+
+const data = snap.val() || {};
+const div = document.getElementById("orders");
+
+div.innerHTML = "";
+
+for(const id in data){
+
+const o = data[id];
+
+const box = document.createElement("div");
+box.className = "box";
+
+box.innerHTML = `
+<b>${o.name}</b><br>
+Delivery: ${o.delivery ? "Yes" : "No"}<br>
+Total: R${o.total}
+`;
+
+div.prepend(box);
+}
+});
+</script>
+
+</body>
+</html>
